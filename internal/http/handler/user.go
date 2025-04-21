@@ -33,7 +33,7 @@ func (h *UserHandler) Info() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		info, err := h.userService.GetUserInfo(c)
 		if err != nil {
-			wrapper.JSON404(c, nil, err)
+			c.Error(err)
 			return
 		}
 

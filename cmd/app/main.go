@@ -6,7 +6,6 @@ import (
 	"ienergy-template-go/config"
 	"ienergy-template-go/internal/app"
 	"ienergy-template-go/pkg/database"
-	"ienergy-template-go/pkg/errormap"
 	"ienergy-template-go/pkg/graceful"
 	"ienergy-template-go/pkg/logger"
 	"ienergy-template-go/pkg/swagger"
@@ -45,7 +44,6 @@ func startServer(g *gin.Engine, lifecycle fx.Lifecycle, logger *logger.StandardL
 
 func main() {
 	fx.New(
-		fx.Invoke(errormap.Initialize),
 		fx.Provide(config.NewConfig),
 		fx.Provide(database.NewDatabase),
 		fx.Provide(logger.NewLogger),

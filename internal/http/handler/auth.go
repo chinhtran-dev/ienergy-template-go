@@ -35,17 +35,17 @@ func (h *AuthHandler) Register() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req request.UserRegisterRequest
 		if err := c.BindJSON(&req); err != nil {
-			wrapper.JSON400(c, nil, err)
+			c.Error(err)
 			return
 		}
 		err := req.Validate()
 		if err != nil {
-			wrapper.JSON400(c, nil, err)
+			c.Error(err)
 			return
 		}
 		resp, err := h.authService.Register(c, req)
 		if err != nil {
-			wrapper.JSON500(c, nil, err)
+			c.Error(err)
 			return
 		}
 		wrapper.JSONOk(c, resp)
@@ -67,21 +67,23 @@ func (h *AuthHandler) Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req request.UserLoginRequest
 		if err := c.BindJSON(&req); err != nil {
-			wrapper.JSON400(c, nil, err)
+			c.Error(err)
 			return
 		}
 		err := req.Validate()
 		if err != nil {
-			wrapper.JSON400(c, nil, err)
+			c.Error(err)
 			return
 		}
 		resp, err := h.authService.Login(c, req)
+
 		if err != nil {
-			wrapper.JSON401(c, nil, err)
+			c.Error(err)
 			return
 		}
+
 		if len(resp.Token) == 0 {
-			wrapper.JSON401(c, nil, err)
+			c.Error(err)
 			return
 		}
 		wrapper.JSONOk(c, resp)

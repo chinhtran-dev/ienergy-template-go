@@ -2,11 +2,9 @@ package service_test
 
 import (
 	"context"
-	"errors"
-	"ienergy-template-go/internal/model/entity"
 	"ienergy-template-go/internal/model/response"
 	"ienergy-template-go/internal/service"
-	"ienergy-template-go/pkg/constant"
+	"ienergy-template-go/pkg/errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -30,55 +28,47 @@ func TestUserService_GetUserInfo(t *testing.T) {
 
 	// Define test cases
 	testCases := []struct {
-		name          string
-		userID        uuid.UUID
-		mockSetup     func(*MockUserRepo, *MockDatabase)
-		expectedError error
-		validateResp  func(*testing.T, response.UserInfoResponse, error)
+		name         string
+		userID       uuid.UUID
+		mockSetup    func(*MockUserRepo, *MockDatabase)
+		expectedResp response.UserInfoResponse
+		expectedErr  *errors.AppError
 	}{
 		{
 			name:   "successful get user info",
 			userID: uuid.New(),
 			mockSetup: func(m *MockUserRepo, db *MockDatabase) {
-				mockUser := entity.User{
-					ID:        uuid.New(),
-					Email:     "test@example.com",
-					FirstName: "John",
-					LastName:  "Doe",
-				}
-				m.On("GetUserByID", mock.Anything, mock.Anything).Return(mockUser, nil)
+				m.On("GetUserByID", mock.Anything, mock.Anything).Return(response.UserInfoResponse{
+					UserID:   uuid.New(),
+					Email:    "test@example.com",
+					FullName: "John Doe",
+				}, nil)
 			},
-			expectedError: nil,
-			validateResp: func(t *testing.T, resp response.UserInfoResponse, err error) {
-				assert.NoError(t, err)
-				assert.NotEmpty(t, resp.UserID)
-				assert.Equal(t, "test@example.com", resp.Email)
-				assert.Equal(t, "John Doe", resp.FullName)
+			expectedResp: response.UserInfoResponse{
+				UserID:   uuid.New(),
+				Email:    "test@example.com",
+				FullName: "John Doe",
 			},
+			expectedErr: nil,
 		},
 		{
 			name:   "user not found",
 			userID: uuid.New(),
 			mockSetup: func(m *MockUserRepo, db *MockDatabase) {
-				m.On("GetUserByID", mock.Anything, mock.Anything).Return(entity.User{}, errors.New("user not found"))
+				m.On("GetUserByID", mock.Anything, mock.Anything).Return(response.UserInfoResponse{},
+					errors.NewNotFoundError("user not found"))
 			},
-			expectedError: errors.New("user not found"),
-			validateResp: func(t *testing.T, resp response.UserInfoResponse, err error) {
-				assert.Error(t, err)
-				assert.Empty(t, resp.UserID)
-			},
+			expectedResp: response.UserInfoResponse{},
+			expectedErr:  errors.NewNotFoundError("user not found"),
 		},
 		{
 			name:   "invalid user id in context",
 			userID: uuid.Nil,
 			mockSetup: func(m *MockUserRepo, db *MockDatabase) {
-				// No mock setup needed as the function should return early
+				// No mock setup needed as validation should fail before service call
 			},
-			expectedError: nil,
-			validateResp: func(t *testing.T, resp response.UserInfoResponse, err error) {
-				assert.NoError(t, err)
-				assert.Empty(t, resp.UserID)
-			},
+			expectedResp: response.UserInfoResponse{},
+			expectedErr:  errors.NewUnauthorizedError("invalid user id"),
 		},
 	}
 
@@ -91,14 +81,18 @@ func TestUserService_GetUserInfo(t *testing.T) {
 			// Setup mock
 			tc.mockSetup(mockUserRepo, mockDB)
 
-			// Create context with userID
-			ctx := context.WithValue(context.Background(), constant.UserID, tc.userID)
+			// Create context with user ID
+			ctx := context.Background()
+			if tc.userID != uuid.Nil {
+				ctx = context.WithValue(ctx, "user_id", tc.userID)
+			}
 
-			// Execute test
+			// Execute service method
 			resp, err := userService.GetUserInfo(ctx)
 
-			// Validate results
-			tc.validateResp(t, resp, err)
+			// Validate response
+			assert.Equal(t, tc.expectedResp, resp)
+			assert.Equal(t, tc.expectedErr, err)
 			mockUserRepo.AssertExpectations(t)
 		})
 	}

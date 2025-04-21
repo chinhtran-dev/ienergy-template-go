@@ -6,6 +6,7 @@ import (
 	"ienergy-template-go/internal/model/response"
 	"ienergy-template-go/internal/repository"
 	"ienergy-template-go/pkg/database"
+	"ienergy-template-go/pkg/errors"
 	"ienergy-template-go/pkg/util"
 
 	"github.com/google/uuid"
@@ -24,11 +25,11 @@ type userService struct {
 func (u *userService) GetUserInfo(ctx context.Context) (user response.UserInfoResponse, err error) {
 	userID := util.UserIDFromCTX(ctx)
 	if userID == uuid.Nil {
-		return
+		return user, errors.NewBadRequestError("User ID is not found")
 	}
 	userEntity, err := u.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		return
+		return user, err
 	}
 
 	user = response.UserInfoResponse{
@@ -37,7 +38,7 @@ func (u *userService) GetUserInfo(ctx context.Context) (user response.UserInfoRe
 		FullName: fmt.Sprintf("%s %s", userEntity.FirstName, userEntity.LastName),
 	}
 
-	return
+	return user, nil
 }
 
 func NewUserService(

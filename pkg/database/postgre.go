@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"ienergy-template-go/config"
+	"ienergy-template-go/internal/model/entity"
 	"time"
 
 	loggerCustom "ienergy-template-go/pkg/logger"
@@ -51,6 +52,8 @@ func NewDatabase(lc fx.Lifecycle, config *config.Config, log *loggerCustom.Stand
 		log.WithError(err).Fatal("Failed to get DB from gorm")
 		return nil, err
 	}
+
+	db.AutoMigrate(&entity.User{})
 
 	if config.DB.SetMaxIdleConns != "" {
 		sqlDb.SetMaxIdleConns(cast.ToInt(config.DB.SetMaxIdleConns))

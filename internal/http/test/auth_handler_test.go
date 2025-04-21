@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"ienergy-template-go/internal/http/handler"
 	"ienergy-template-go/internal/model/request"
 	"ienergy-template-go/internal/model/response"
+	"ienergy-template-go/pkg/errors"
 	"ienergy-template-go/pkg/wrapper"
 	"net/http"
 	"net/http/httptest"
@@ -26,11 +26,17 @@ type MockAuthService struct {
 
 func (m *MockAuthService) Register(ctx context.Context, req request.UserRegisterRequest) (response.UserInfoResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return response.UserInfoResponse{}, args.Error(1)
+	}
 	return args.Get(0).(response.UserInfoResponse), args.Error(1)
 }
 
 func (m *MockAuthService) Login(ctx context.Context, req request.UserLoginRequest) (response.TokenResponse, error) {
 	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return response.TokenResponse{}, args.Error(1)
+	}
 	return args.Get(0).(response.TokenResponse), args.Error(1)
 }
 
@@ -103,7 +109,7 @@ func TestAuthHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 				assert.Nil(t, resp.Data)
-				assert.NotNil(t, resp.Message)
+				assert.NotEmpty(t, resp.Message)
 			},
 		},
 		{
@@ -118,20 +124,18 @@ func TestAuthHandler_Register(t *testing.T) {
 			mockSetup: func(m *MockAuthService) {
 				m.On("Register", mock.Anything, mock.Anything).Return(
 					response.UserInfoResponse{},
-					errors.New("email already exists"),
+					errors.NewConflictError("email already exists"),
 				)
 			},
-			expectedCode: http.StatusInternalServerError,
+			expectedCode: http.StatusConflict,
 			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var resp wrapper.Response
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+				assert.Equal(t, http.StatusConflict, resp.StatusCode)
 				assert.Nil(t, resp.Data)
-				assert.NotNil(t, resp.Message)
-				if resp.Message != nil {
-					assert.Equal(t, "email already exists", *resp.Message)
-				}
+				assert.NotEmpty(t, resp.Message)
+				assert.Equal(t, "email already exists", resp.Message)
 			},
 		},
 	}
@@ -226,7 +230,7 @@ func TestAuthHandler_Login(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 				assert.Nil(t, resp.Data)
-				assert.NotNil(t, resp.Message)
+				assert.NotEmpty(t, resp.Message)
 			},
 		},
 		{
@@ -238,7 +242,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			mockSetup: func(m *MockAuthService) {
 				m.On("Login", mock.Anything, mock.Anything).Return(
 					response.TokenResponse{},
-					errors.New("invalid credentials"),
+					errors.NewUnauthorizedError("invalid credentials"),
 				)
 			},
 			expectedCode: http.StatusUnauthorized,
@@ -248,10 +252,8 @@ func TestAuthHandler_Login(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 				assert.Nil(t, resp.Data)
-				assert.NotNil(t, resp.Message)
-				if resp.Message != nil {
-					assert.Equal(t, "invalid credentials", *resp.Message)
-				}
+				assert.NotEmpty(t, resp.Message)
+				assert.Equal(t, "invalid credentials", resp.Message)
 			},
 		},
 	}

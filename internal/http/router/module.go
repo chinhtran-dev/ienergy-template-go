@@ -10,9 +10,10 @@ import (
 
 type RouterParams struct {
 	fx.In
-	AuthRoutes AuthRoutes
-	UserRoutes UserRoutes
-	Logger     *logger.StandardLogger
+	AuthRoutes   AuthRoutes
+	UserRoutes   UserRoutes
+	Logger       *logger.StandardLogger
+	ErrorHandler *middleware.ErrorHandler
 }
 
 func NewRouter(params RouterParams) *gin.Engine {
@@ -20,6 +21,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 
 	router.Use(middleware.CorsMiddleware())
 	router.Use(middleware.LoggingMiddleware(params.Logger))
+	router.Use(params.ErrorHandler.Handle())
 
 	api := router.Group("/api/v1")
 	params.AuthRoutes.Setup(api)
@@ -30,5 +32,6 @@ func NewRouter(params RouterParams) *gin.Engine {
 var Module = fx.Options(
 	fx.Provide(NewAuthRoutes),
 	fx.Provide(NewUserRoutes),
+	fx.Provide(middleware.NewErrorHandler),
 	fx.Provide(NewRouter),
 )

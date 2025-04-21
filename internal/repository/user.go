@@ -2,10 +2,9 @@ package repository
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"ienergy-template-go/internal/model/entity"
 	"ienergy-template-go/pkg/database"
+	"ienergy-template-go/pkg/errors"
 
 	logger "github.com/sirupsen/logrus"
 
@@ -15,13 +14,13 @@ import (
 )
 
 type UserRepo interface {
-	GetUserByID(ctx context.Context, userID uuid.UUID) (resp entity.User, err error)
-	GetUserByEmail(ctx context.Context, email string) (resp entity.User, err error)
-	UserRegister(ctx context.Context, userInfo entity.User) (resp entity.User, err error)
-	ValidateUser(userInfo entity.User) (userID uuid.UUID, err error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (resp entity.User, error error)
+	GetUserByEmail(ctx context.Context, email string) (resp entity.User, error error)
+	UserRegister(ctx context.Context, userInfo entity.User) (resp entity.User, error error)
+	ValidateUser(userInfo entity.User) (userID uuid.UUID, error error)
 	UpdateUser(ctx context.Context, userInfo entity.User) error
 	DeleteUser(ctx context.Context, userInfo entity.User) error
-	VerifyUserEmail(ctx context.Context, email string) (err error)
+	VerifyUserEmail(ctx context.Context, email string) error
 }
 
 type userRepo struct {
@@ -36,27 +35,40 @@ func NewUserRepo(db database.Database) UserRepo {
 
 // DeleteUser implements IUserRepo.
 func (u *userRepo) DeleteUser(ctx context.Context, userInfo entity.User) error {
-	return u.db.Delete(&entity.User{
+	err := u.db.Delete(&entity.User{
 		ID: userInfo.ID,
 	}).Error
+	if err != nil {
+		return errors.NewNotFoundError("User not found")
+	}
+	return nil
 }
 
 // GetUserByEmail implements IUserRepo.
-func (u *userRepo) GetUserByEmail(ctx context.Context, email string) (resp entity.User, err error) {
-	err = u.db.
+func (u *userRepo) GetUserByEmail(ctx context.Context, email string) (resp entity.User, error error) {
+	err := u.db.
 		Where("email = ?", email).
 		First(&resp).Error
+	if err != nil {
+		return resp, errors.NewInternalServerError("Database error: " + err.Error())
+	}
 	if resp.ID == uuid.Nil {
-		return resp, fmt.Errorf("Email address not found: %v", email)
+		return resp, errors.NewNotFoundError("User not found")
 	}
 	return
 }
 
 // GetUserByID implements IUserRepo.
-func (u *userRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (resp entity.User, err error) {
-	err = u.db.
+func (u *userRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (resp entity.User, error error) {
+	err := u.db.
 		Where("id = ?", userID).
 		Find(&resp).Error
+	if err != nil {
+		return resp, errors.NewInternalServerError("Database error: " + err.Error())
+	}
+	if resp.ID == uuid.Nil {
+		return resp, errors.NewNotFoundError("User not found")
+	}
 	return
 }
 
@@ -64,17 +76,21 @@ func (u *userRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (resp enti
 func (u *userRepo) UpdateUser(ctx context.Context, userInfo entity.User) error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInfo.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return errors.NewInternalServerError("Database error: " + err.Error())
 	}
 	userInfo.Password = string(hashedPassword)
-	return u.db.Save(&userInfo).Error
+	err = u.db.Save(&userInfo).Error
+	if err != nil {
+		return errors.NewInternalServerError("Database error: " + err.Error())
+	}
+	return nil
 }
 
 // UserRegister implements IUserRepo.
-func (u *userRepo) UserRegister(ctx context.Context, userInfo entity.User) (resp entity.User, err error) {
+func (u *userRepo) UserRegister(ctx context.Context, userInfo entity.User) (resp entity.User, error error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInfo.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return
+		return userInfo, errors.NewInternalServerError("Database error: " + err.Error())
 	}
 	userInfo.Password = string(hashedPassword)
 	dbExecute := u.db.Create(&userInfo)
@@ -83,21 +99,20 @@ func (u *userRepo) UserRegister(ctx context.Context, userInfo entity.User) (resp
 			WithField("UserRegister-Input", userInfo).
 			WithError(err).
 			Error()
-		return userInfo, dbExecute.Error
+		return userInfo, errors.NewInternalServerError("Database error: " + dbExecute.Error.Error())
 	}
 
 	return userInfo, nil
 }
 
 // ValidateUser implements IUserRepo.
-func (u *userRepo) ValidateUser(userInfo entity.User) (userID uuid.UUID, err error) {
+func (u *userRepo) ValidateUser(userInfo entity.User) (userID uuid.UUID, error error) {
 	var userInfoDB entity.User
 	dbQuery := u.db.
 		Where("email = ?", userInfo.Email).
 		Find(&userInfoDB)
 	if dbQuery.Error != nil {
-		err = dbQuery.Error
-		return
+		return userID, errors.NewInternalServerError("Database error: " + dbQuery.Error.Error())
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(userInfoDB.Password), []byte(userInfo.Password)) == nil {
@@ -105,23 +120,24 @@ func (u *userRepo) ValidateUser(userInfo entity.User) (userID uuid.UUID, err err
 		return
 	}
 
-	return
+	return userID, errors.NewUnauthorizedError("Invalid email or password")
 }
 
 // VerifyUserEmail implements IUserRepo.
-func (u *userRepo) VerifyUserEmail(ctx context.Context, email string) (err error) {
+func (u *userRepo) VerifyUserEmail(ctx context.Context, email string) error {
 	var resp []entity.User
-	err = u.db.
+	err := u.db.
+		WithContext(ctx).
 		Where("email = ?", email).
 		Find(&resp).Error
 	if err != nil {
-		if err == gorm.ErrEmptySlice {
+		if err == gorm.ErrRecordNotFound {
 			return nil
 		}
-		return
+		return errors.NewInternalServerError("Database error: " + err.Error())
 	}
 	if len(resp) != 0 {
-		return errors.New("Email already exists")
+		return errors.NewConflictError("Email already exists")
 	}
-	return
+	return nil
 }

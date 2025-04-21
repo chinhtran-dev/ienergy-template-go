@@ -44,4 +44,6 @@ const (
 	ParsingError = -12
 	// ConflictError
 	ConflictError = -13
+	// ForbiddenError
+	ForbiddenError = -14
 )

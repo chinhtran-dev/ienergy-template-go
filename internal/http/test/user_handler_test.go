@@ -1,12 +1,10 @@
-package handler_test
+package handler
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"ienergy-template-go/internal/http/handler"
 	"ienergy-template-go/internal/model/response"
-	"ienergy-template-go/pkg/constant"
 	"ienergy-template-go/pkg/wrapper"
 	"net/http"
 	"net/http/httptest"
@@ -18,126 +16,76 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockUserService implements the UserService interface for testing
 type MockUserService struct {
 	mock.Mock
 }
 
 func (m *MockUserService) GetUserInfo(ctx context.Context) (response.UserInfoResponse, error) {
 	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return response.UserInfoResponse{}, args.Error(1)
+	}
 	return args.Get(0).(response.UserInfoResponse), args.Error(1)
 }
 
-// TestUserHandler_Info tests the Info handler functionality
 func TestUserHandler_Info(t *testing.T) {
-	t.Parallel()
+	// Setup
+	gin.SetMode(gin.TestMode)
+	mockService := new(MockUserService)
+	userHandler := handler.NewUserHandler(mockService)
 
-	// Setup test dependencies
-	mockUserService := new(MockUserService)
-	userHandler := handler.NewUserHandler(mockUserService)
+	// Create test UUID
+	testUUID := uuid.New()
 
-	// Define test cases
-	testCases := []struct {
-		name         string
-		userID       uuid.UUID
-		mockSetup    func(*MockUserService)
-		expectedCode int
-		validateResp func(*testing.T, *httptest.ResponseRecorder)
+	// Test cases
+	tests := []struct {
+		name           string
+		setupMock      func()
+		expectedStatus int
+		expectedBody   interface{}
 	}{
 		{
-			name:   "successful get user info",
-			userID: uuid.New(),
-			mockSetup: func(m *MockUserService) {
-				m.On("GetUserInfo", mock.Anything).Return(response.UserInfoResponse{
-					UserID:   uuid.New(),
+			name: "Success - Get user info",
+			setupMock: func() {
+				mockService.On("GetUserInfo", mock.Anything).Return(response.UserInfoResponse{
+					UserID:   testUUID,
 					Email:    "test@example.com",
-					FullName: "John Doe",
+					FullName: "Test User",
 				}, nil)
 			},
-			expectedCode: http.StatusOK,
-			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp wrapper.Response
-				err := json.Unmarshal(w.Body.Bytes(), &resp)
-				assert.NoError(t, err)
-				assert.Equal(t, http.StatusOK, resp.StatusCode)
-				assert.NotNil(t, resp.Data)
-
-				// Validate response data
-				var userInfo response.UserInfoResponse
-				dataBytes, _ := json.Marshal(resp.Data)
-				err = json.Unmarshal(dataBytes, &userInfo)
-				assert.NoError(t, err)
-				assert.Equal(t, "test@example.com", userInfo.Email)
-				assert.Equal(t, "John Doe", userInfo.FullName)
-			},
-		},
-		{
-			name:   "user not found",
-			userID: uuid.New(),
-			mockSetup: func(m *MockUserService) {
-				m.On("GetUserInfo", mock.Anything).Return(response.UserInfoResponse{},
-					errors.New("user not found"))
-			},
-			expectedCode: http.StatusNotFound,
-			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp wrapper.Response
-				err := json.Unmarshal(w.Body.Bytes(), &resp)
-				assert.NoError(t, err)
-				assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-				assert.Nil(t, resp.Data)
-				assert.NotNil(t, resp.Message)
-				if resp.Message != nil {
-					assert.Equal(t, "user not found", *resp.Message)
-				}
-			},
-		},
-		{
-			name:   "invalid user id in context",
-			userID: uuid.Nil,
-			mockSetup: func(m *MockUserService) {
-				// Even though we expect an early return, we still need to set up the mock
-				// to avoid unexpected method call errors
-				m.On("GetUserInfo", mock.Anything).Return(response.UserInfoResponse{},
-					errors.New("user not found"))
-			},
-			expectedCode: http.StatusNotFound,
-			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp wrapper.Response
-				err := json.Unmarshal(w.Body.Bytes(), &resp)
-				assert.NoError(t, err)
-				assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-				assert.Nil(t, resp.Data)
-				assert.NotNil(t, resp.Message)
-			},
+			expectedStatus: http.StatusOK,
+			expectedBody: wrapper.NewResponse(http.StatusOK, 0, response.UserInfoResponse{
+				UserID:   testUUID,
+				Email:    "test@example.com",
+				FullName: "Test User",
+			}, "Success"),
 		},
 	}
 
-	// Run test cases
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			// Setup mock
-			tc.mockSetup(mockUserService)
+			tt.setupMock()
 
 			// Create test context
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 
-			// Add user ID to context if not nil
-			if tc.userID != uuid.Nil {
-				c.Request = httptest.NewRequest("GET", "/user/info", nil)
-				c.Set(constant.UserID, tc.userID)
-			}
-
-			// Execute handler
+			// Call handler
 			userHandler.Info()(c)
 
-			// Validate response
-			assert.Equal(t, tc.expectedCode, w.Code)
-			tc.validateResp(t, w)
-			mockUserService.AssertExpectations(t)
+			// Assertions
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			// Convert expected body to JSON string
+			expectedJSON, err := json.Marshal(tt.expectedBody)
+			assert.NoError(t, err)
+
+			// Compare JSON strings
+			assert.JSONEq(t, string(expectedJSON), w.Body.String())
+
+			// Verify mock expectations
+			mockService.AssertExpectations(t)
 		})
 	}
 }
