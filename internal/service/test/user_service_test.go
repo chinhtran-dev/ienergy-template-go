@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
 )
 
 // TestUserService_GetUserInfo tests the GetUserInfo functionality of UserService
@@ -21,6 +22,10 @@ func TestUserService_GetUserInfo(t *testing.T) {
 	// Setup test dependencies
 	mockUserRepo := new(MockUserRepo)
 	mockDB := new(MockDatabase)
+
+	// Setup mock database to return a valid DB instance
+	mockDB.On("GetDB").Return(&gorm.DB{})
+
 	userService := service.NewUserService(mockUserRepo, mockDB)
 
 	// Define test cases

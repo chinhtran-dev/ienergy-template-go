@@ -43,6 +43,10 @@ func NewSuccessResponse(c *gin.Context, data interface{}) *Response {
 	return NewResponse(c, http.StatusOK, data, nil, nil)
 }
 
+func NewNotFoundResponse(c *gin.Context, data interface{}, err error) *Response {
+	return NewResponse(c, http.StatusNotFound, data, nil, err)
+}
+
 func NewUnauthorizationResponse(c *gin.Context, data interface{}, err error) *Response {
 	return NewResponse(c, http.StatusUnauthorized, data, nil, err)
 }
@@ -57,6 +61,10 @@ func NewInternalServerErrorResponse(c *gin.Context, data interface{}, err error)
 
 func JSON401(c *gin.Context, data interface{}, err error) {
 	c.JSON(http.StatusUnauthorized, NewUnauthorizationResponse(c, data, err))
+}
+
+func JSON404(c *gin.Context, data interface{}, err error) {
+	c.JSON(http.StatusNotFound, NewNotFoundResponse(c, data, err))
 }
 
 func JSON400(c *gin.Context, data interface{}, err error) {

@@ -8,6 +8,7 @@ import (
 	"ienergy-template-go/internal/model/request"
 	"ienergy-template-go/internal/model/response"
 	"ienergy-template-go/internal/service"
+	"ienergy-template-go/pkg/constant"
 	"ienergy-template-go/pkg/logger"
 	"testing"
 
@@ -22,13 +23,16 @@ func TestAuthService_Login(t *testing.T) {
 
 	// Setup test dependencies
 	mockUserRepo := new(MockUserRepo)
-	mockLogger := new(logger.StandardLogger)
 	mockConfig := &config.Config{
+		Server: config.ServerCfg{
+			Env: constant.DevelopmentEnv,
+		},
 		JWT: config.JWTConfig{
 			Secret:         "secret",
 			ExpirationTime: "1", // 1 hour
 		},
 	}
+	mockLogger := logger.NewLogger(mockConfig)
 
 	authService := service.NewAuthService(mockUserRepo, mockLogger, mockConfig)
 
@@ -97,13 +101,16 @@ func TestAuthService_Register(t *testing.T) {
 
 	// Setup test dependencies
 	mockUserRepo := new(MockUserRepo)
-	mockLogger := new(logger.StandardLogger)
 	mockConfig := &config.Config{
+		Server: config.ServerCfg{
+			Env: constant.DevelopmentEnv,
+		},
 		JWT: config.JWTConfig{
 			Secret:         "secret",
 			ExpirationTime: "1", // 1 hour
 		},
 	}
+	mockLogger := logger.NewLogger(mockConfig)
 
 	authService := service.NewAuthService(mockUserRepo, mockLogger, mockConfig)
 

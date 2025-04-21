@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"ienergy-template-go/internal/http/handler"
 	"ienergy-template-go/internal/model/request"
 	"ienergy-template-go/internal/model/response"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// MockAuthService implements the AuthService interface for testing
 type MockAuthService struct {
 	mock.Mock
 }
@@ -32,173 +34,254 @@ func (m *MockAuthService) Login(ctx context.Context, req request.UserLoginReques
 	return args.Get(0).(response.TokenResponse), args.Error(1)
 }
 
+// TestAuthHandler_Register tests the Register handler functionality
 func TestAuthHandler_Register(t *testing.T) {
-	// Mock AuthService
+	t.Parallel()
+
+	// Setup test dependencies
 	mockAuthService := new(MockAuthService)
+	authHandler := handler.NewAuthHandler(mockAuthService)
 
-	// Tạo AuthHandler với mock AuthService
-	handler := handler.NewAuthHandler(mockAuthService)
+	// Define test cases
+	testCases := []struct {
+		name         string
+		req          request.UserRegisterRequest
+		mockSetup    func(*MockAuthService)
+		expectedCode int
+		validateResp func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "successful registration",
+			req: request.UserRegisterRequest{
+				Email:           "test@example.com",
+				Password:        "password123",
+				FirstName:       "John",
+				LastName:        "Doe",
+				ConfirmPassword: "password123",
+			},
+			mockSetup: func(m *MockAuthService) {
+				m.On("Register", mock.Anything, mock.Anything).Return(
+					response.UserInfoResponse{
+						UserID:   uuid.New(),
+						Email:    "test@example.com",
+						FullName: "John Doe",
+					}, nil,
+				)
+			},
+			expectedCode: http.StatusOK,
+			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp wrapper.Response
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				assert.NotNil(t, resp.Data)
 
-	// Định nghĩa request giả
-	registerReq := request.UserRegisterRequest{
-		Email:           "test@example.com",
-		Password:        "password123",
-		FirstName:       "John",
-		LastName:        "Doe",
-		ConfirmPassword: "password123",
+				// Validate response data
+				var userInfo response.UserInfoResponse
+				dataBytes, _ := json.Marshal(resp.Data)
+				err = json.Unmarshal(dataBytes, &userInfo)
+				assert.NoError(t, err)
+				assert.Equal(t, "test@example.com", userInfo.Email)
+				assert.Equal(t, "John Doe", userInfo.FullName)
+			},
+		},
+		{
+			name: "invalid request - missing email",
+			req: request.UserRegisterRequest{
+				Password:        "password123",
+				FirstName:       "John",
+				LastName:        "Doe",
+				ConfirmPassword: "password123",
+			},
+			mockSetup: func(m *MockAuthService) {
+				// No mock setup needed as validation should fail before service call
+			},
+			expectedCode: http.StatusBadRequest,
+			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp wrapper.Response
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+				assert.Nil(t, resp.Data)
+				assert.NotNil(t, resp.Message)
+			},
+		},
+		{
+			name: "email already exists",
+			req: request.UserRegisterRequest{
+				Email:           "existing@example.com",
+				Password:        "password123",
+				FirstName:       "John",
+				LastName:        "Doe",
+				ConfirmPassword: "password123",
+			},
+			mockSetup: func(m *MockAuthService) {
+				m.On("Register", mock.Anything, mock.Anything).Return(
+					response.UserInfoResponse{},
+					errors.New("email already exists"),
+				)
+			},
+			expectedCode: http.StatusInternalServerError,
+			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp wrapper.Response
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+				assert.Nil(t, resp.Data)
+				assert.NotNil(t, resp.Message)
+				if resp.Message != nil {
+					assert.Equal(t, "email already exists", *resp.Message)
+				}
+			},
+		},
 	}
 
-	// Mock hàm Register trong AuthService
-	mockAuthService.On("Register", mock.Anything, registerReq).Return(
-		response.UserInfoResponse{
-			UserID:   uuid.New(),
-			Email:    "test@example.com",
-			FullName: "John Doe",
-		}, nil,
-	).Once()
+	// Run test cases
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Tạo request JSON cho đăng ký
-	reqBody, err := json.Marshal(registerReq)
-	assert.NoError(t, err)
+			// Setup mock
+			tc.mockSetup(mockAuthService)
 
-	// Tạo HTTP request và recorder để ghi nhận kết quả
-	req, _ := http.NewRequest("POST", "/auth/register", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
+			// Create request body
+			reqBody, err := json.Marshal(tc.req)
+			assert.NoError(t, err)
 
-	// Tạo gin context và gọi handler
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = req
-	handler.Register()(c)
+			// Create test context
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest("POST", "/auth/register", bytes.NewBuffer(reqBody))
+			c.Request.Header.Set("Content-Type", "application/json")
 
-	// Kiểm tra status code
-	assert.Equal(t, http.StatusOK, recorder.Code)
+			// Execute handler
+			authHandler.Register()(c)
 
-	// Kiểm tra response body
-	var resp wrapper.Response
-	err = json.Unmarshal(recorder.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-	assert.NotNil(t, resp.Data)
-	assert.Equal(t, 200, resp.StatusCode)
-}
-
-func TestAuthHandler_Register_InvalidRequest(t *testing.T) {
-	// Mock AuthService
-	mockAuthService := new(MockAuthService)
-
-	// Tạo AuthHandler với mock AuthService
-	handler := handler.NewAuthHandler(mockAuthService)
-
-	// Tạo request giả không hợp lệ (thiếu email)
-	registerReq := request.UserRegisterRequest{
-		Password:  "password123",
-		FirstName: "John",
-		LastName:  "Doe",
+			// Validate response
+			assert.Equal(t, tc.expectedCode, w.Code)
+			tc.validateResp(t, w)
+			mockAuthService.AssertExpectations(t)
+		})
 	}
-
-	// Tạo request JSON cho đăng ký
-	reqBody, err := json.Marshal(registerReq)
-	assert.NoError(t, err)
-
-	// Tạo HTTP request và recorder để ghi nhận kết quả
-	req, _ := http.NewRequest("POST", "/auth/register", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-
-	// Tạo gin context và gọi handler
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = req
-	handler.Register()(c)
-
-	// Kiểm tra status code lỗi
-	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-
-	// Kiểm tra response body
-	var resp wrapper.Response
-	err = json.Unmarshal(recorder.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-	assert.NotNil(t, resp.Message)
-	assert.Equal(t, 400, resp.StatusCode)
 }
 
+// TestAuthHandler_Login tests the Login handler functionality
 func TestAuthHandler_Login(t *testing.T) {
-	// Mock AuthService
+	t.Parallel()
+
+	// Setup test dependencies
 	mockAuthService := new(MockAuthService)
+	authHandler := handler.NewAuthHandler(mockAuthService)
 
-	// Tạo AuthHandler với mock AuthService
-	handler := handler.NewAuthHandler(mockAuthService)
+	// Define test cases
+	testCases := []struct {
+		name         string
+		req          request.UserLoginRequest
+		mockSetup    func(*MockAuthService)
+		expectedCode int
+		validateResp func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "successful login",
+			req: request.UserLoginRequest{
+				Email:    "test@example.com",
+				Password: "password123",
+			},
+			mockSetup: func(m *MockAuthService) {
+				m.On("Login", mock.Anything, mock.Anything).Return(
+					response.TokenResponse{
+						Token: "valid_token_123",
+					}, nil,
+				)
+			},
+			expectedCode: http.StatusOK,
+			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp wrapper.Response
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+				assert.NotNil(t, resp.Data)
 
-	// Tạo request giả cho đăng nhập
-	loginReq := request.UserLoginRequest{
-		Email:    "test@example.com",
-		Password: "password123",
+				// Validate response data
+				var tokenResp response.TokenResponse
+				dataBytes, _ := json.Marshal(resp.Data)
+				err = json.Unmarshal(dataBytes, &tokenResp)
+				assert.NoError(t, err)
+				assert.Equal(t, "valid_token_123", tokenResp.Token)
+			},
+		},
+		{
+			name: "invalid request - missing email",
+			req: request.UserLoginRequest{
+				Password: "password123",
+			},
+			mockSetup: func(m *MockAuthService) {
+				// No mock setup needed as validation should fail before service call
+			},
+			expectedCode: http.StatusBadRequest,
+			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp wrapper.Response
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+				assert.Nil(t, resp.Data)
+				assert.NotNil(t, resp.Message)
+			},
+		},
+		{
+			name: "invalid credentials",
+			req: request.UserLoginRequest{
+				Email:    "test@example.com",
+				Password: "wrongpassword",
+			},
+			mockSetup: func(m *MockAuthService) {
+				m.On("Login", mock.Anything, mock.Anything).Return(
+					response.TokenResponse{},
+					errors.New("invalid credentials"),
+				)
+			},
+			expectedCode: http.StatusUnauthorized,
+			validateResp: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp wrapper.Response
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+				assert.Nil(t, resp.Data)
+				assert.NotNil(t, resp.Message)
+				if resp.Message != nil {
+					assert.Equal(t, "invalid credentials", *resp.Message)
+				}
+			},
+		},
 	}
 
-	// Mock hàm Login trong AuthService
-	mockAuthService.On("Login", mock.Anything, loginReq).Return(
-		response.TokenResponse{
-			Token: "valid_token_123",
-		}, nil,
-	).Once()
+	// Run test cases
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Tạo request JSON cho đăng nhập
-	reqBody, err := json.Marshal(loginReq)
-	assert.NoError(t, err)
+			// Setup mock
+			tc.mockSetup(mockAuthService)
 
-	// Tạo HTTP request và recorder để ghi nhận kết quả
-	req, _ := http.NewRequest("POST", "/auth/login", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
+			// Create request body
+			reqBody, err := json.Marshal(tc.req)
+			assert.NoError(t, err)
 
-	// Tạo gin context và gọi handler
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = req
-	handler.Login()(c)
+			// Create test context
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest("POST", "/auth/login", bytes.NewBuffer(reqBody))
+			c.Request.Header.Set("Content-Type", "application/json")
 
-	// Kiểm tra status code
-	assert.Equal(t, http.StatusOK, recorder.Code)
+			// Execute handler
+			authHandler.Login()(c)
 
-	// Kiểm tra response body
-	var resp wrapper.Response
-	err = json.Unmarshal(recorder.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-	assert.NotNil(t, resp.Data)
-	assert.Equal(t, 200, resp.StatusCode)
-}
-
-func TestAuthHandler_Login_InvalidRequest(t *testing.T) {
-	// Mock AuthService
-	mockAuthService := new(MockAuthService)
-
-	// Tạo AuthHandler với mock AuthService
-	handler := handler.NewAuthHandler(mockAuthService)
-
-	// Tạo request giả không hợp lệ (thiếu email)
-	loginReq := request.UserLoginRequest{
-		Password: "password123",
+			// Validate response
+			assert.Equal(t, tc.expectedCode, w.Code)
+			tc.validateResp(t, w)
+			mockAuthService.AssertExpectations(t)
+		})
 	}
-
-	// Tạo request JSON cho đăng nhập
-	reqBody, err := json.Marshal(loginReq)
-	assert.NoError(t, err)
-
-	// Tạo HTTP request và recorder để ghi nhận kết quả
-	req, _ := http.NewRequest("POST", "/auth/login", bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-
-	// Tạo gin context và gọi handler
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = req
-	handler.Login()(c)
-
-	// Kiểm tra status code lỗi
-	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-
-	// Kiểm tra response body
-	var resp wrapper.Response
-	err = json.Unmarshal(recorder.Body.Bytes(), &resp)
-	assert.NoError(t, err)
-	assert.NotNil(t, resp.Message)
-	assert.Equal(t, 400, resp.StatusCode)
 }
