@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"ienergy-template-go/pkg/constant"
 	"ienergy-template-go/pkg/errors"
 	"ienergy-template-go/pkg/logger"
 	"ienergy-template-go/pkg/wrapper"
@@ -32,7 +33,7 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 				h.logger.Error("panic recovered", "error", err, "stack", string(debug.Stack()))
 				c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
 					http.StatusInternalServerError,
-					0,
+					constant.InternalServerError,
 					nil,
 					"internal server error",
 				))
@@ -54,24 +55,19 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 			// Handle different types of errors
 			switch e := err.(type) {
 			case *errors.AppError:
-				c.JSON(e.Status, wrapper.NewResponse(
-					e.Status,
-					0,
-					nil,
-					e.Message,
-				))
+				c.JSON(e.Status, wrapper.NewErrorResponse(e))
 			case validator.ValidationErrors:
 				if len(e) > 0 {
 					c.JSON(http.StatusBadRequest, wrapper.NewResponse(
 						http.StatusBadRequest,
-						0,
+						constant.BadRequestErr,
 						nil,
 						"validation error",
 					))
 				} else {
 					c.JSON(http.StatusBadRequest, wrapper.NewResponse(
 						http.StatusBadRequest,
-						0,
+						constant.BadRequestErr,
 						nil,
 						"invalid request",
 					))
@@ -81,7 +77,7 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 			default:
 				c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
 					http.StatusInternalServerError,
-					0,
+					constant.InternalServerError,
 					nil,
 					err.Error(),
 				))
@@ -95,7 +91,7 @@ func (h *ErrorHandler) handleDatabaseError(c *gin.Context, err *pq.Error) {
 	if err == nil {
 		c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
 			http.StatusInternalServerError,
-			0,
+			constant.InternalServerError,
 			nil,
 			"database error",
 		))
@@ -113,7 +109,7 @@ func (h *ErrorHandler) handleDatabaseError(c *gin.Context, err *pq.Error) {
 	case "23503": // foreign_key_violation
 		c.JSON(http.StatusBadRequest, wrapper.NewResponse(
 			http.StatusBadRequest,
-			0,
+			constant.BadRequestErr,
 			nil,
 			"invalid reference",
 		))
@@ -121,7 +117,7 @@ func (h *ErrorHandler) handleDatabaseError(c *gin.Context, err *pq.Error) {
 		h.logger.Error("database error", "error", err)
 		c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
 			http.StatusInternalServerError,
-			0,
+			constant.InternalServerError,
 			nil,
 			"database error",
 		))

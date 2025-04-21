@@ -12,12 +12,17 @@ const (
 )
 
 func UserIDFromCTX(ctx context.Context) (userID uuid.UUID) {
-	userID, ok := ctx.Value(UserIDCTX).(uuid.UUID)
-	if !ok || userID == uuid.Nil {
+	user, ok := ctx.Value(UserIDCTX).(string)
+	if !ok || user == "" {
 		return uuid.Nil
 	}
 
-	return userID
+	userID, err := uuid.Parse(user)
+	if err != nil {
+		return uuid.Nil
+	}
+
+	return
 }
 
 func UserEmailFromCTX(ctx context.Context) (email string) {
