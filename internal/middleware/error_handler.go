@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"ienergy-template-go/pkg/constant"
 	"ienergy-template-go/pkg/errors"
 	"ienergy-template-go/pkg/logger"
 	"ienergy-template-go/pkg/wrapper"
@@ -31,11 +30,8 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				h.logger.Error("panic recovered", "error", err, "stack", string(debug.Stack()))
-				c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
-					http.StatusInternalServerError,
-					constant.InternalServerError,
-					nil,
-					"internal server error",
+				c.JSON(http.StatusInternalServerError, wrapper.NewErrorResponse(
+					errors.NewInternalServerError("Internal server error"),
 				))
 			}
 		}()
@@ -58,28 +54,19 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 				c.JSON(e.Status, wrapper.NewErrorResponse(e))
 			case validator.ValidationErrors:
 				if len(e) > 0 {
-					c.JSON(http.StatusBadRequest, wrapper.NewResponse(
-						http.StatusBadRequest,
-						constant.BadRequestErr,
-						nil,
-						"validation error",
+					c.JSON(http.StatusBadRequest, wrapper.NewErrorResponse(
+						errors.NewBadRequestError("validation error"),
 					))
 				} else {
-					c.JSON(http.StatusBadRequest, wrapper.NewResponse(
-						http.StatusBadRequest,
-						constant.BadRequestErr,
-						nil,
-						"invalid request",
+					c.JSON(http.StatusBadRequest, wrapper.NewErrorResponse(
+						errors.NewBadRequestError("invalid request"),
 					))
 				}
 			case *pq.Error:
 				h.handleDatabaseError(c, e)
 			default:
-				c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
-					http.StatusInternalServerError,
-					constant.InternalServerError,
-					nil,
-					err.Error(),
+				c.JSON(http.StatusInternalServerError, wrapper.NewErrorResponse(
+					errors.NewInternalServerError(e.Error()),
 				))
 			}
 		}
@@ -89,37 +76,25 @@ func (h *ErrorHandler) Handle() gin.HandlerFunc {
 // handleDatabaseError handles database specific errors
 func (h *ErrorHandler) handleDatabaseError(c *gin.Context, err *pq.Error) {
 	if err == nil {
-		c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
-			http.StatusInternalServerError,
-			constant.InternalServerError,
-			nil,
-			"database error",
+		c.JSON(http.StatusInternalServerError, wrapper.NewErrorResponse(
+			errors.NewInternalServerError("database error"),
 		))
 		return
 	}
 
 	switch err.Code {
 	case "23505": // unique_violation
-		c.JSON(http.StatusConflict, wrapper.NewResponse(
-			http.StatusConflict,
-			0,
-			nil,
-			"resource already exists",
+		c.JSON(http.StatusConflict, wrapper.NewErrorResponse(
+			errors.NewConflictError("resource already exists"),
 		))
 	case "23503": // foreign_key_violation
-		c.JSON(http.StatusBadRequest, wrapper.NewResponse(
-			http.StatusBadRequest,
-			constant.BadRequestErr,
-			nil,
-			"invalid reference",
+		c.JSON(http.StatusBadRequest, wrapper.NewErrorResponse(
+			errors.NewBadRequestError("invalid reference"),
 		))
 	default:
 		h.logger.Error("database error", "error", err)
-		c.JSON(http.StatusInternalServerError, wrapper.NewResponse(
-			http.StatusInternalServerError,
-			constant.InternalServerError,
-			nil,
-			"database error",
+		c.JSON(http.StatusInternalServerError, wrapper.NewErrorResponse(
+			errors.NewInternalServerError("database error"),
 		))
 	}
 }
