@@ -10,12 +10,6 @@ A Go-based template project for building scalable and maintainable web applicati
 4. [Technology Stack](#technology-stack)
 5. [Getting Started](#getting-started)
 6. [Project Structure](#project-structure)
-7. [Development](#development)
-8. [Testing](#testing)
-9. [Deployment](#deployment)
-10. [Contributing](#contributing)
-11. [License](#license)
-
 ## Overview
 
 `ienergy-template-go` is a boilerplate project designed to help developers quickly set up a Go-based web application. It includes pre-configured tools and best practices for development, testing, and deployment.
@@ -124,8 +118,7 @@ Refer to `.env.example` for a complete list of variables.
 │   ├── app/                # Main application entry point
 │   │   └── main.go         # Starts the application
 │   └── migrate/            # Database migration commands
-├── config/                 # Configuration files
-│   └── config.yaml         # Centralized configuration file
+├── config/                 # Configuration handling
 ├── docs/                   # Documentation
 │   └── swagger/            # Swagger API documentation
 ├── internal/               # Private application code
