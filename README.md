@@ -143,7 +143,6 @@ Refer to `.env.example` for a complete list of variables.
 │   ├── util/               # General utility functions
 │   └── wrapper/            # Response wrappers for standardizing API responses
 ├── test/                   # Test files
-│   ├── e2e/                # End to End tests
 │   └── integration/        # Integration tests
 ├── .env                    # Environment variables file
 ├── .env.example            # Example environment variables file
