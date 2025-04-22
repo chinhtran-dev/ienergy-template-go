@@ -1,6 +1,7 @@
 # Development Guideline
 
 ## Table of Contents
+
 1. [Prerequisites](#prerequisites)
 2. [Project Structure](#project-structure)
 3. [Getting Started](#getting-started)
@@ -14,60 +15,39 @@
 
 ## Prerequisites
 
-- Go 1.24 or higher
-- PostgreSQL 12 or higher
-- Make
+- **Go**: Version 1.24 or higher
+- **PostgreSQL**: Version 12 or higher
+- **Make**: For running development commands
 
 ### Required Tools
 
-Install all required development tools using:
+Install all required tools using:
 ```bash
 make install-tools
 ```
 
 This will install:
-- Swag CLI (for API documentation)
-- Migrate CLI (for database migrations)
-- GolangCI-Lint (for code linting)
-- Mockery (for generating mocks)
+- **Swag CLI**: For generating API documentation
+- **Migrate CLI**: For managing database migrations
+- **GolangCI-Lint**: For linting Go code
 
 ## Project Structure
 
 ```
 .
 ├── cmd/                    # Application entry points
-│   ├── app/               # Main application
-│   │   └── main.go        # Application entry point
-│   └── migrate/           # Migration commands
-├── config/                # Configuration files
-├── docs/                  # Documentation
-│   └── swagger/          # Swagger API documentation
-├── internal/              # Private application code
-│   ├── app/              # Application core
-│   ├── http/             # HTTP handlers
-│   ├── middleware/       # HTTP middleware
-│   ├── model/            # Data models
-│   ├── repository/       # Data access layer
-│   └── service/          # Business logic
-├── migrations/            # Database migrations
-├── pkg/                  # Public packages
-│   ├── constant/         # Constants
-│   ├── database/         # Database utilities
-│   ├── errormap/         # Error mapping
-│   ├── ginbuilder/       # Gin framework utilities
-│   ├── graceful/         # Graceful shutdown
-│   ├── logger/           # Logging utilities
-│   ├── swagger/          # Swagger utilities
-│   ├── tracking/         # Request tracking
-│   ├── util/             # Utility functions
-│   └── wrapper/          # Response wrappers
-├── test/                 # Test files
-├── .env                  # Environment variables
-├── .env.example          # Example environment variables
-├── .golangci.yml         # GolangCI-Lint configuration
-├── Makefile              # Build and development commands
-└── go.mod                # Go module definition
+├── config/                 # Configuration files
+├── docs/                   # Documentation (Swagger)
+├── internal/               # Private application code
+├── migrations/             # Database migrations
+├── pkg/                    # Public reusable packages
+├── test/                   # Test files
+├── .env                    # Environment variables
+├── Makefile                # Build and development commands
+└── go.mod                  # Go module definition
 ```
+
+For a detailed explanation, see the [README](README.md).
 
 ## Getting Started
 
@@ -105,7 +85,7 @@ This will install:
    git checkout -b feature/your-feature-name
    ```
 
-2. Make your changes following the code style guidelines
+2. Make your changes following the code style guidelines.
 
 3. Run tests:
    ```bash
@@ -128,7 +108,7 @@ This will install:
    git push origin feature/your-feature-name
    ```
 
-7. Create a pull request
+7. Create a pull request.
 
 ## Database Migrations
 
@@ -164,8 +144,8 @@ This will install:
    ```
 
 3. View API documentation:
-   - Run the application
-   - Visit `http://localhost:8080/swagger/index.html`
+   - Run the application.
+   - Visit `http://localhost:8080/swagger/index.html`.
 
 ## Testing
 
@@ -176,9 +156,8 @@ This will install:
 
 2. Run specific test types:
    ```bash
-   make test-unit      # Run unit tests
-   make test-http      # Run HTTP tests
-   make test-all       # Run all test types
+   make test-unit      # Unit tests
+   make test-http      # HTTP tests
    ```
 
 3. Run linting:
@@ -193,18 +172,18 @@ This will install:
    go fmt ./...
    ```
 
-2. Follow these naming conventions:
-   - Packages: lowercase, single word
-   - Interfaces: `I` prefix (e.g., `IUserService`)
-   - Structs: PascalCase
-   - Functions: PascalCase for public, camelCase for private
-   - Variables: camelCase
-   - Constants: UPPER_SNAKE_CASE
+2. Naming conventions:
+   - **Packages**: lowercase, single word
+   - **Interfaces**: `I` prefix (e.g., `IUserService`)
+   - **Structs**: PascalCase
+   - **Functions**: PascalCase for public, camelCase for private
+   - **Variables**: camelCase
+   - **Constants**: UPPER_SNAKE_CASE
 
 3. Comment your code:
-   - Use `//` for single-line comments
-   - Use `/* */` for multi-line comments
-   - Document all public functions and types
+   - Use `//` for single-line comments.
+   - Use `/* */` for multi-line comments.
+   - Document all public functions and types.
 
 ## Git Workflow
 
@@ -220,10 +199,10 @@ This will install:
    - Example: `feat: add user authentication`
 
 3. Pull requests:
-   - Create from feature branch to main
-   - Include description of changes
-   - Link related issues
-   - Request review from team members
+   - Create from feature branch to main.
+   - Include a description of changes.
+   - Link related issues.
+   - Request review from team members.
 
 ## Deployment
 
@@ -232,16 +211,14 @@ This will install:
    make build
    ```
 
-2. The binary will be created in `bin/app`
+2. Deploy the binary (`bin/app`) to your server.
 
-3. Deploy the binary to your server
-
-4. Run database migrations:
+3. Run database migrations:
    ```bash
    make migrate-up
    ```
 
-5. Start the application:
+4. Start the application:
    ```bash
    ./bin/app api
    ```
@@ -253,4 +230,4 @@ This will install:
 - [GORM Documentation](https://gorm.io/docs/)
 - [Swagger Documentation](https://swaggo.github.io/swaggo.io/)
 - [Migrate Documentation](https://github.com/golang-migrate/migrate)
-- [GolangCI-Lint Documentation](https://golangci-lint.run/) 
+- [GolangCI-Lint Documentation](https://golangci-lint.run/)
