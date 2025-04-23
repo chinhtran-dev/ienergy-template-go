@@ -7,21 +7,6 @@ install-tools:
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@echo "Tools installed successfully!"
 
-migrate-up:
-	go run cmd/migrate/main.go -action up
-
-migrate-down:
-	go run cmd/migrate/main.go -action down
-
-migrate-force:
-	go run cmd/migrate/main.go -action force $(version)
-
-migrate-version:
-	go run cmd/migrate/main.go -action version
-
-migrate-create:
-	migrate create -ext sql -dir ./migrations -seq $(name)
-
 swagger-init:
 	swag init -g cmd/app/main.go -o docs/swagger
 
