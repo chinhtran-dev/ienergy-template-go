@@ -116,8 +116,7 @@ Refer to `.env.example` for a complete list of variables.
 .
 ├── cmd/                    # Application entry points
 │   ├── app/                # Main application entry point
-│   │   └── main.go         # Starts the application
-│   └── migrate/            # Database migration commands
+│       └── main.go         # Starts the application
 ├── config/                 # Configuration handling
 ├── docs/                   # Documentation
 │   └── swagger/            # Swagger API documentation
@@ -128,9 +127,6 @@ Refer to `.env.example` for a complete list of variables.
 │   ├── model/              # Data models and entities
 │   ├── repository/         # Data access layer (e.g., database queries)
 │   └── service/            # Business logic and services
-├── migrations/             # Database migration files
-│   ├── *.up.sql            # Migration scripts for applying changes
-│   └── *.down.sql          # Migration scripts for rolling back changes
 ├── pkg/                    # Public reusable packages
 │   ├── constant/           # Application-wide constants
 │   ├── database/           # Database connection utilities
